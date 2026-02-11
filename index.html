@@ -14,24 +14,33 @@
     form{display:flex;gap:8px;padding:12px 16px;border-top:1px solid #ddd;background:#fff}
     input{flex:1;padding:10px 12px;border:1px solid #ccc;border-radius:10px}
     button{padding:10px 14px;border:0;border-radius:10px;cursor:pointer}
-    button:disabled{opacity:.6;cursor:not-allowed}
+    .small{font-size:12px;color:#666;margin-top:6px}
   </style>
 </head>
 <body>
-  <header><b>AI Chat UI</b></header>
+  <header>
+    <b>AI Chat UI</b>
+    <div class="small">Backend: <span id="be"></span></div>
+  </header>
 
   <div id="chat"></div>
 
   <form id="f">
     <input id="t" placeholder="Type a message…" autocomplete="off" />
-    <button id="btn" type="submit">Send</button>
+    <button type="submit">Send</button>
   </form>
 
   <script>
+    // ✅ PASTIIN INI URL WORKER KAMU
+    const WORKER_CHAT_URL = "https://holy-math-2632.keboangobb.workers.dev/chat";
+    // ✅ TOKEN YANG KAMU SET VIA wrangler secret put BOT_TOKEN
+    const BOT_TOKEN = "kebo-9999";
+
+    document.getElementById("be").textContent = WORKER_CHAT_URL;
+
     const chat = document.getElementById("chat");
     const form = document.getElementById("f");
     const text = document.getElementById("t");
-    const btn = document.getElementById("btn");
 
     function add(role, content){
       const div = document.createElement("div");
@@ -48,43 +57,32 @@
       e.preventDefault();
       const msg = text.value.trim();
       if(!msg) return;
-
       text.value = "";
-      btn.disabled = true;
-
       add("user", msg);
-      const lastBot = add("bot", "…");
+      const bubble = add("bot", "…");
 
       try {
-        const r = await fetch("/api/chat", {
+        const r = await fetch(WORKER_CHAT_URL, {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
+          headers: {
+            "Content-Type": "application/json",
+            "Authorization": "Bearer " + BOT_TOKEN
+          },
           body: JSON.stringify({ message: msg })
         });
 
-        // selalu ambil text dulu biar aman kalau server balas non-JSON
-        const raw = await r.text();
+        const raw = await r.text(); // <- biar ga error JSON kalau kosong
         let data = {};
-        try { data = JSON.parse(raw); } catch {}
+        try { data = JSON.parse(raw); } catch (_) {}
 
-        if (!r.ok) {
-          throw new Error(data?.error || `Request failed (${r.status})`);
+        if(!r.ok) {
+          const errMsg = data?.error || raw || ("HTTP " + r.status);
+          throw new Error(errMsg);
         }
 
-        // dukung beberapa bentuk respons
-        const out =
-          data.text ??
-          data.response ??
-          data.result ??
-          data.output_text ??
-          (typeof data === "string" ? data : "");
-
-        lastBot.textContent = out || "(empty)";
+        bubble.textContent = data.text || data.response || "(empty)";
       } catch (err) {
-        lastBot.textContent = "Error: " + (err?.message || String(err));
-      } finally {
-        btn.disabled = false;
-        text.focus();
+        bubble.textContent = "Error: " + err.message;
       }
     });
   </script>
